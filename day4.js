@@ -20,16 +20,44 @@ const testData = `
 const find = (string, regex) => {
   const res = string.match(regex) ? string.match(regex)[0] : null;
   return res;
-}
+};
+
 const dataLines = (data) => {
   return data.trim().split('\n');
-}
+};
 
 const getAct = (data) => {
   if (/asleep/.test(data)) return 'sleep';
   if (/wakes/.test(data)) return 'wake';
   return '';
+};
+
+const hour = (entry) => parseInt(time.slice(11, 13));
+const minute = (entry) => parseInt(time.slice(14));
+
+const sleepCycles = (entrySet) => {
+  const cycles = [];
+  let cycle = [];
+  entrySet.forEach(e => {
+    if (e.act === 'sleep') cycle = [{ h: hour(e.time), m: minute(e.time)}];
+    if (e.act === 'wake') {
+      cycle.push({ h: hour(e.time), m: minute(e.time)});
+      cycles.push(cycle);
+      cycle = [];
+    }
+  });
 }
+
+const makeShift = (entrySet) => {
+  const hours = [];
+  const cycles = sleepCycles(entrySet);
+  let minute = 0;
+  let currentCycle = cycles.shift();
+  let guardState = currentCycle.h === 23 ? 's' : 'a';
+  while (minute < 24) {
+    if (hour > 23 && currentCycle.m > 0)
+  }
+};
 
 const createAction = (data) => {
   const time = data.slice(1, 17);
@@ -38,18 +66,18 @@ const createAction = (data) => {
   return { time, guard, act };
 }
 
-// const shifts = (entries) => {
-//   const shiftsByGuard = {};
-//   let onDuty;
-//   let day;
-//   let sleep;
-//   let wake;
-//   entries.forEach(e => {
-//     if (e.act === 'start')
-//     day = e.time.slice(0, 10);
-//     if ()
-//   });
-// }
+const shifts = (entries) => {
+  const shiftsByGuard = {};
+  let onDuty;
+  let day;
+  let sleep;
+  let wake;
+  entries.forEach(e => {
+    if (e.act === 'start')
+    day = e.time.slice(0, 10);
+    if ()
+  });
+};
 
 const processLog = (entries) => {
   const pEntries = entries.map(e => createAction(e));
