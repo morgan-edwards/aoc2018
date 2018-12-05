@@ -1,4 +1,3 @@
-const axios = require('axios');
 const fs = require('fs');
 
 const getLocalData = (fileName) => (
@@ -8,18 +7,10 @@ const getLocalData = (fileName) => (
         console.log(err);
         reject(err);
       }
-      resolve(data);
+      resolve(data.trim());
     });
   })
 );
-
-getNetworkData = async (url) => {
-  const data = await axios.get(url);
-  console.log(data);
-  return data;
-}
-
-
 
 const head = (arr) => {
   return arr[0];
@@ -31,7 +22,6 @@ const tail = (arr) => {
 
 module.exports = {
   getLocalData,
-  getNetworkData,
   head,
   tail,
 }
