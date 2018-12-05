@@ -89,7 +89,7 @@ const makeShift = (entrySet) => {
 
 const createAction = (data) => {
   const time = data.slice(1, 17);
-  const guard = find(data, /#.[^ ]/);
+  const guard = find(data, /#\S*/);
   const act = guard ? 'start' : getAct(data);
   return { time, guard, act };
 }
@@ -156,6 +156,6 @@ const firstSolution = (raw) => {
 };
 
 getLocalData('./data/dayFourData.txt').then(res => {
-  const solutionOne = firstSolution(testData);
+  const solutionOne = firstSolution(res);
   console.log('FIRST: ', solutionOne);
 });
