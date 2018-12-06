@@ -2,6 +2,8 @@ const moment = require('moment');
 
 const {
   getLocalData,
+  head,
+  tail,
 } = require('./utils/utils.js');
 
 const testData = `
@@ -24,95 +26,12 @@ const testData = `
 [1518-11-05 00:55] wakes up
 `
 
-const testSet = [{ time: '1518-11-01 00:00', guard: '#10', act: 'start' },
-  { time: '1518-11-01 00:05', guard: null, act: 'sleep' },
-  { time: '1518-11-01 00:25', guard: null, act: 'wake' },
-  { time: '1518-11-01 00:30', guard: null, act: 'sleep' },
-  { time: '1518-11-01 00:55', guard: null, act: 'wake' }]
-
-const find = (string, regex) => {
-  const res = string.match(regex) ? string.match(regex)[0] : null;
-  return res;
-};
-
+// Processing functions
 const dataLines = (data) => {
-  return data.trim().split('\n');
+  const lines = data.trim().split('\n');
+  return lines;
 };
 
-const getAct = (data) => {
-  if (/asleep/.test(data)) return 'sleep';
-  if (/wakes/.test(data)) return 'wake';
-  return '';
-};
-
-const hour = (e) => parseInt(e.time.slice(11, 13));
-const minute = (e) => parseInt(e.time.slice(14));
-const date = (e) => {
-  if (hour(e) > 0) {
-    return moment(e.time.slice(0, 10)).add(1, 'day').format('YYYY-MM-DD');
-  }
-  return e.time.slice(0,10);
-}
-
-const sleepCycles = (entrySet) => {
-  const cycles = [];
-  let cycle = [];
-  entrySet.forEach(e => {
-    if (e.act === 'sleep') cycle = [{ h: hour(e), m: minute(e)}];
-    if (e.act === 'wake') {
-      cycle.push({ h: hour(e), m: minute(e)});
-      cycles.push(cycle);
-      cycle = [];
-    }
-  });
-  return cycles;
-}
-
-const makeShift = (entrySet) => {
-  const hour = [];
-  const cycles = sleepCycles(entrySet);
-  let minute = 0;
-  let [sleep, wake] = cycles.shift();
-  let guardState = 'awake';
-  while (minute < 60) {
-    if (minute === sleep.m) guardState = 'asleep';
-    if (minute === wake.m) {
-      [sleep, wake] = cycles[0] || [61, 61];
-      guardState = 'awake';
-      cycles.shift();
-    }
-    hour.push(guardState);
-    minute += 1;
-  }
-  return hour;
-};
-
-const createAction = (data) => {
-  const time = data.slice(1, 17);
-  const guard = find(data, /#.[^ ]/);
-  const act = guard ? 'start' : getAct(data);
-  return { time, guard, act };
-}
-
-const nights = (data) => {
-  const nights = {};
-  let guard = data[0].guard;
-  let currDate = date(data[0]);
-  let entries = [];
-  data.forEach(e => {
-    const now = date(e);
-    if (currDate !== now) {
-      nights[currDate] = { guard, entries };
-      guard = e.guard;
-      currDate = now;
-      entries = [e];
-    } else {
-      entries.push(e);
-    }
-  });
-  nights[currDate] = { guard, entries };
-  return nights;
-}
 
 const processLog = (entries) => {
   const pEntries = entries.map(e => createAction(e));
@@ -122,40 +41,127 @@ const processLog = (entries) => {
   })
 }
 
-const firstSolution = (raw) => {
-  const data = processLog(dataLines(raw));
-  const shiftData = nights(data);
-  const withHours = Object.keys(shiftData).map(key => {
-    const sd = shiftData[key];
-    const hours = makeShift(sd.entries);
-    const slept = hours.filter(h => h === 'asleep').length
-    return Object.assign({}, sd, { hours , slept, date: key });
+const find = (string, regex) => {
+  const res = string.match(regex) ? string.match(regex)[0] : null;
+  return res;
+};
+
+const getAct = (data) => {
+  if (/asleep/.test(data)) return 'sleep';
+  if (/wakes/.test(data)) return 'wake';
+  return '';
+};
+
+
+const createAction = (data) => {
+  const time = data.slice(1, 17);
+  const guard = find(data, /#.[^ ]/);
+  const act = guard ? 'start' : getAct(data);
+  return { time, guard, act };
+}
+
+const hour = (e) => parseInt(e.time.slice(11, 13));
+const minute = (e) => parseInt(e.time.slice(14, 16));
+const date = (e) => {
+  if (hour(e) > 0) {
+    return moment(e.time.slice(0, 10)).add(1, 'day').format('YYYY-MM-DD');
+  }
+  return e.time.slice(0,10);
+}
+
+// Parsing logic
+const shifts = (log) => {
+  const makeShift = (line) => ({
+    date: date(line),
+    guard: line.guard,
+    hours: Array(60).fill(false),
+    entries: [],
   });
-  const guardSleep = withHours.reduce((acc, shift) => {
-    const tracker = acc[shift.guard] || { totalSlept: 0, hours: {} };
-    tracker.totalSlept += shift.slept;
-    shift.hours.forEach((h, idx) => {
-      let hour = tracker.hours[idx] || 0;
-      if (h === 'asleep') hour += 1;
-      tracker.hours[idx] = hour;
+  let currShift = makeShift(log[0]);
+  let remainingLog = log.slice(1);
+  const allShifts = remainingLog.reduce((acc, line) => {
+    if (line.guard) {
+      acc.push(currShift);
+      currShift = makeShift(line);
+      return acc;
+    };
+    currShift.entries.push(line);
+    return acc;
+  }, []);
+  allShifts.push(currShift);
+  console.log(allShifts.slice(allShifts.length - 1)[0].entries);
+  return allShifts;
+};
+
+const processHours = (hours, entries) => {
+  const sleepPoints = entries.map(e => minute(e));
+  if (sleepPoints.length === 0) sleepPoints.push(0);
+  const toggleHours = (sps, hs, lowerBound) => {
+    if (sps.length === 0) return hs;
+    const nextPoint = head(sps);
+    const remaining = tail(sps);
+    const keep = hs.slice(0, lowerBound);
+    const toggled = hs.map((h, idx) => {
+      if (idx >= nextPoint) {
+        return !h;
+      }
+      return h;
     });
-    acc[shift.guard] = tracker;
+    return toggleHours(remaining, toggled, nextPoint);
+  }
+  return toggleHours(sleepPoints, hours, 0);
+};
+
+const shiftsByGuard = (shiftData) => {
+  return shiftData.reduce((acc, sd) => {
+    const guardShifts = acc[sd.guard] || [];
+    guardShifts.push(sd);
+    acc[sd.guard] = guardShifts;
     return acc;
   }, {});
-  const sleepiest = Object.keys(guardSleep).map(key => Object.assign({}, guardSleep[key], { guard: parseInt(key.slice(1)) }))
-    .sort((a, b) => {
-      if (a.totalSlept < b.totalSlept) return 1;
-      return -1;
-    })[0];
-  const sleepiestHour = Object.keys(sleepiest.hours).map(key => ({ h: key, amt: sleepiest.hours[key] }))
-    .sort((a, b) => {
-      if (a.amt < b.amt) return 1;
-      return -1;
-    })[0];
-  return parseInt(sleepiestHour.h) * sleepiest.guard;
+};
+
+const hourBreakDowns = (shiftsByGuard) => {
+  return Object.keys(shiftsByGuard).map(gId => {
+    const hourTotals = shiftsByGuard[gId].reduce((acc, sd) => {
+      const { hours } = sd;
+      hours.forEach((h, idx) => {
+        if (h) acc[idx] = (acc[idx] || 0) + 1;
+      });
+      return acc;
+    }, {});
+    return { guardId: gId, hours: hourTotals };
+  });
+};
+
+const addHours = (hourBreakDowns) => {
+  return hourBreakDowns.map(hbd => {
+    const total = Object.values(hbd.hours).reduce((acc, amt) => acc + amt);
+    const mostSlept = Object.keys(hbd.hours).map(key => ({ hour: key, amt: hbd.hours[key] }))
+      .sort((a, b) => {
+        if (a.amt < b.amt) return 1;
+        return -1;
+      })[0];
+    return Object.assign({}, hbd, { total, mostSlept });
+  });
+};
+
+// First solution
+const firstSolution = (raw) => {
+  const log = processLog(dataLines(raw));
+  const shiftData = shifts(log).map(s => Object.assign({}, s, { hours: processHours(s.hours, s.entries) }));
+  const guardShifts = shiftsByGuard(shiftData);
+  console.log(guardShifts['#22']);
+  const breakdowns = hourBreakDowns(guardShifts);
+  const totals = addHours(breakdowns);
+  const worstGuard = totals.sort((a, b) => {
+    if (a.total < b.total) return 1;
+    return -1;
+  })[0];
+  return parseInt(worstGuard.guardId.slice(1)) * parseInt(worstGuard.mostSlept.hour);
 };
 
 getLocalData('./data/dayFourData.txt').then(res => {
-  const solutionOne = firstSolution(testData);
+  const solutionOne = firstSolution(res);
   console.log('FIRST: ', solutionOne);
 });
