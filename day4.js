@@ -112,6 +112,13 @@ const processHours = (hours, entries) => {
   return toggleHours(sleepPoints, hours, 0);
 };
 
+const createAction = (data) => {
+  const time = data.slice(1, 17);
+  const guard = find(data, /#\S*/);
+  const act = guard ? 'start' : getAct(data);
+  return { time, guard, act };
+}
+
 const shiftsByGuard = (shiftData) => {
   return shiftData.reduce((acc, sd) => {
     const guardShifts = acc[sd.guard] || [];

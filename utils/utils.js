@@ -20,8 +20,13 @@ const tail = (arr) => {
   return arr.slice(1, arr.length);
 };
 
+const last = (arr) => arr.slice(arr.length - 1)[0];
+const init = (arr) => arr.slice(0, arr.length - 1);
+
 module.exports = {
   getLocalData,
   head,
   tail,
+  last,
+  init,
 }
